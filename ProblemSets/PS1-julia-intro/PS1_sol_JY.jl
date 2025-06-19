@@ -511,3 +511,272 @@ end
 # Call the functions in order
 A, B, C, D = q1()
 q2(A, B, C)
+
+# 3(a) Import nlsw88.csv and process it
+
+println("\n" ^ 2 * "="^50)
+println("QUESTION 3: Reading in Data and calculating summary statistics")
+println("="^50)
+
+println("\n3(a) Importing and processing nlsw88.csv")
+
+# Read the raw CSV file with explicit missing value handling
+nlsw88 = CSV.read("nlsw88.csv", DataFrame, 
+                  missingstring=["", "NA", "NULL", ".", "missing", "n/a", " "])
+
+println("Raw data loaded:")
+println("Dimensions: $(size(nlsw88))")
+println("Column names: $(names(nlsw88))")
+
+# Check data types
+println("\nColumn types:")
+for col in names(nlsw88)
+    println("  $col: $(eltype(nlsw88[!, col]))")
+end
+
+# Check for missing values in the raw data
+println("\nMissing values per column:")
+missing_summary = []
+for col in names(nlsw88)
+    missing_count = count(ismissing, nlsw88[!, col])
+    total_count = nrow(nlsw88)
+    if missing_count > 0
+        pct_missing = round(100 * missing_count / total_count, digits=1)
+        println("  $col: $missing_count/$total_count ($pct_missing%)")
+        push!(missing_summary, (col, missing_count, pct_missing))
+    else
+        println("  $col: 0 missing values")
+    end
+end
+
+# Clean variable names (make them more Julia-friendly)
+println("\nCleaning variable names...")
+original_names = names(nlsw88)
+
+# The names look already clean, but let's make sure they're lowercase and standardized
+cleaned_names = [lowercase(string(col)) for col in names(nlsw88)]
+
+# Apply cleaned names
+rename!(nlsw88, Symbol.(cleaned_names))
+println("Variable names after cleaning: $(names(nlsw88))")
+
+# Additional data validation
+println("\nData validation:")
+println("Sample of first 5 rows:")
+display(first(nlsw88, 5))
+
+# Check ranges for key variables to spot any obvious data issues
+println("\nData ranges for key numeric variables:")
+numeric_cols = ["age", "grade", "wage", "hours", "ttl_exp", "tenure"]
+for col in numeric_cols
+    if col in names(nlsw88)
+        col_data = skipmissing(nlsw88[!, col])
+        if !isempty(col_data)  # Use isempty instead of length
+            min_val = minimum(col_data)
+            max_val = maximum(col_data)
+            mean_val = round(mean(col_data), digits=2)
+            println("  $col: [$min_val, $max_val], mean = $mean_val")
+        else
+            println("  $col: all values are missing")
+        end
+    end
+end
+
+# Save the processed data
+CSV.write("nlsw88_processed.csv", nlsw88)
+println("\nProcessed data saved as 'nlsw88_processed.csv'")
+
+# Final summary
+println("\nFinal processed dataset summary:")
+println("Dimensions: $(size(nlsw88))")
+println("Variables: $(join(names(nlsw88), ", "))")
+if !isempty(missing_summary)
+    println("Variables with missing values: $(length(missing_summary))")
+    for (col, count, pct) in missing_summary
+        println("  $col: $pct%")
+    end
+else
+    println("No missing values detected")
+end
+
+# 3(b) Calculate percentages for marital status and education
+println("\n 3(b) Calculating sample percentages")
+
+total_obs = nrow(nlsw88)
+println("Total observations: $total_obs")
+
+# Never been married percentage
+# Using the 'never_married' column (1 = never married, 0 = ever married)
+never_married_count = count(x -> !ismissing(x) && x == 1, nlsw88.never_married)
+never_married_missing = count(ismissing, nlsw88.never_married)
+never_married_valid = total_obs - never_married_missing
+
+# Calculate percentage based on valid responses
+never_married_pct = round(100 * never_married_count / never_married_valid, digits=2)
+println("\nNever been married:")
+println("  Count: $never_married_count out of $never_married_valid valid responses")
+println("  Percentage: $never_married_pct%")
+if never_married_missing > 0
+    println("  Missing: $never_married_missing observations")
+end
+
+# College graduates percentage
+# Using the 'collgrad' column (1 = college graduate, 0 = not college graduate)
+college_grad_count = count(x -> !ismissing(x) && x == 1, nlsw88.collgrad)
+collgrad_missing = count(ismissing, nlsw88.collgrad)
+collgrad_valid = total_obs - collgrad_missing
+
+# Calculate percentage based on valid responses
+college_grad_pct = round(100 * college_grad_count / collgrad_valid, digits=2)
+println("\nCollege graduates:")
+println("  Count: $college_grad_count out of $collgrad_valid valid responses")
+println("  Percentage: $college_grad_pct%")
+if collgrad_missing > 0
+    println("  Missing: $collgrad_missing observations")
+end
+
+# Summary
+println("\n" * "="^40)
+println("SUMMARY:")
+println("• $never_married_pct% of the sample has never been married")
+println("• $college_grad_pct% of the sample are college graduates")
+println("="^40)
+
+# 3(c) Use freqtable() to report race category percentages
+using FreqTables
+
+println("\n3(c) Race category frequencies using freqtable()")
+
+# Create frequency table for race
+race_freq = freqtable(nlsw88.race)
+println("Frequency table for race:")
+println(race_freq)
+
+# Calculate percentages manually from the frequency table
+total_valid = sum(race_freq)
+println("\nRace category percentages:")
+for (category, count) in pairs(race_freq)
+    percentage = round(100 * count / total_valid, digits=2)
+    println("  Race $category: $count observations ($percentage%)")
+end
+
+# Alternative: Use prop() function for direct percentages
+println("\nUsing prop() for direct percentages:")
+race_prop = prop(freqtable(nlsw88.race))
+println(race_prop)
+
+# Check for missing values in race variable
+race_missing = count(ismissing, nlsw88.race)
+if race_missing > 0
+    println("\nMissing values in race: $race_missing")
+    println("Percentages calculated from $total_valid valid responses")
+else
+    println("\nNo missing values in race variable")
+end
+
+# Summary with interpretation (assuming standard coding: 1=white, 2=black, 3=other)
+println("\n" * "="^50)
+println("RACE DISTRIBUTION SUMMARY:")
+for (category, count) in pairs(race_freq)
+    percentage = round(100 * count / total_valid, digits=2)
+    race_label = if category == 1
+        "White"
+    elseif category == 2
+        "Black"  
+    elseif category == 3
+        "Other"
+    else
+        "Category $category"
+    end
+    println("• $race_label: $percentage%")
+end
+println("="^50)
+
+# 3(d) Use describe() function to create summary statistics matrix
+println("\n3(d) Creating summary statistics using describe()")
+
+# Create summary statistics for the entire dataframe
+summarystats = describe(nlsw88)
+println("Summary statistics for all variables:")
+display(summarystats)
+
+# Check specifically for missing grade observations
+grade_missing = count(ismissing, nlsw88.grade)
+grade_total = nrow(nlsw88)
+grade_valid = grade_total - grade_missing
+
+println("\nGrade variable missing value analysis:")
+println("Total observations: $grade_total")
+println("Missing grade observations: $grade_missing")
+println("Valid grade observations: $grade_valid")
+if grade_missing > 0
+    grade_missing_pct = round(100 * grade_missing / grade_total, digits=2)
+    println("Percentage missing: $grade_missing_pct%")
+end
+
+# Display detailed statistics for grade variable specifically
+println("\nDetailed statistics for grade variable:")
+grade_stats = describe(nlsw88.grade)
+display(grade_stats)
+
+# Additional summary information
+println("\n" * "="^60)
+println("SUMMARY STATISTICS OVERVIEW:")
+println("Total variables analyzed: $(nrow(summarystats))")
+println("Variables with missing values:")
+for row in eachrow(summarystats)
+    if row.nmissing > 0
+        println("  $(row.variable): $(row.nmissing) missing ($(round(100*row.nmissing/grade_total, digits=1))%)")
+    end
+end
+println("="^60)
+
+# 3(e) Show joint distribution of industry and occupation using cross-tabulation
+using FreqTables
+
+println("\n3(e) Cross-tabulation of industry and occupation")
+
+# Create cross-tabulation between industry and occupation
+crosstab = freqtable(nlsw88.industry, nlsw88.occupation)
+println("Cross-tabulation: Industry (rows) × Occupation (columns)")
+display(crosstab)
+
+# Show marginal distributions
+println("\nMarginal distribution - Industry:")
+industry_marginal = freqtable(nlsw88.industry)
+display(industry_marginal)
+
+println("\nMarginal distribution - Occupation:")
+occupation_marginal = freqtable(nlsw88.occupation)
+display(occupation_marginal)
+
+# Calculate percentages of the joint distribution
+println("\nJoint distribution as percentages:")
+total_valid = sum(crosstab)
+crosstab_pct = prop(crosstab) * 100  # Convert to percentages
+display(round.(crosstab_pct, digits=2))
+
+# Check for missing values in both variables
+industry_missing = count(ismissing, nlsw88.industry)
+occupation_missing = count(ismissing, nlsw88.occupation)
+total_obs = nrow(nlsw88)
+
+println("\nMissing value analysis:")
+println("Total observations: $total_obs")
+println("Missing industry values: $industry_missing")
+println("Missing occupation values: $occupation_missing")
+println("Valid combinations used in cross-tab: $total_valid")
+
+# Summary statistics for the cross-tabulation
+println("\n" * "="^50)
+println("CROSS-TABULATION SUMMARY:")
+println("Industry categories: $(size(crosstab, 1))")
+println("Occupation categories: $(size(crosstab, 2))")
+println("Total valid combinations: $total_valid")
+println("Most common combination:")
+max_count = maximum(crosstab)
+max_indices = findall(x -> x == max_count, crosstab)
+for idx in max_indices
+    println("  Industry $(idx[1]) × Occupation $(idx[2]): $max_count observations")
+end
+println("="^50)
