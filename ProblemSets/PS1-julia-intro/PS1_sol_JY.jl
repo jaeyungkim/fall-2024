@@ -1,6 +1,10 @@
 # adding Packages and using them
 using JLD2, Random, LinearAlgebra, Plots, Statistics, CSV, DataFrames, FreqTables, Distributions
 
+println("Current working directory: $(pwd())")
+cd(dirname(@__FILE__))
+println("Changed to script directory: $(pwd())")
+
 # 1. Initializing variables and practice with basic matrix operations
 # (a) Create the following four matrices of random numbers, setting the seed to ’1234’. Name the matrices and set the dimensions as noted
 
@@ -773,10 +777,666 @@ println("CROSS-TABULATION SUMMARY:")
 println("Industry categories: $(size(crosstab, 1))")
 println("Occupation categories: $(size(crosstab, 2))")
 println("Total valid combinations: $total_valid")
-println("Most common combination:")
+
+# Find most common combination using a different approach
 max_count = maximum(crosstab)
-max_indices = findall(x -> x == max_count, crosstab)
+println("Most common combination:")
+
+# Convert to regular matrix to use findall
+crosstab_matrix = Matrix(crosstab)
+max_indices = findall(x -> x == max_count, crosstab_matrix)
+
 for idx in max_indices
-    println("  Industry $(idx[1]) × Occupation $(idx[2]): $max_count observations")
+    # Get the actual industry and occupation labels from the NamedArray
+    industry_label = names(crosstab, 1)[idx[1]]  # Row names (industries)
+    occupation_label = names(crosstab, 2)[idx[2]]  # Column names (occupations)
+    println("  Industry $industry_label × Occupation $occupation_label: $max_count observations")
 end
 println("="^50)
+
+# 3D Visualization of Cross-tabulation
+using Plots
+plotlyjs()  # Use interactive backend
+
+println("\n📊 Creating 3D visualizations of industry-occupation cross-tabulation")
+
+# Prepare data for 3D plotting
+crosstab_matrix = Matrix(crosstab)
+industry_codes = names(crosstab, 1)
+occupation_codes = names(crosstab, 2)
+
+# Create coordinate matrices for 3D plotting
+n_industries = length(industry_codes)
+n_occupations = length(occupation_codes)
+
+# Method 1: 3D Surface Plot
+println("Creating 3D surface plot...")
+p1 = surface(
+    industry_codes,
+    occupation_codes,
+    crosstab_matrix',
+    title="Industry × Occupation Distribution (3D Surface)",
+    xlabel="Industry Code",
+    ylabel="Occupation Code",
+    zlabel="Number of People",
+    camera=(45, 30),
+    color=:viridis,
+    fill=true
+)
+display(p1)
+
+# Method 2: 3D Wireframe
+println("Creating 3D wireframe...")
+p2 = wireframe(
+    industry_codes,
+    occupation_codes,
+    crosstab_matrix',
+    title="Industry × Occupation (3D Wireframe)",
+    xlabel="Industry Code",
+    ylabel="Occupation Code",
+    zlabel="Number of People",
+    camera=(60, 30),
+    color=:plasma
+)
+display(p2)
+
+# Method 3: 3D Scatter Plot - SIMPLE VERSION
+println("Creating 3D scatter plot...")
+
+# Create data for scatter plot
+x_coords = Float64[]
+y_coords = Float64[]
+z_coords = Float64[]
+
+for (i, industry) in enumerate(valid_industry_codes)
+    for (j, occupation) in enumerate(valid_occupation_codes)
+        count = crosstab_matrix[i, j]
+        if count > 0
+            push!(x_coords, Float64(industry))
+            push!(y_coords, Float64(occupation))
+            push!(z_coords, Float64(count))
+        end
+    end
+end
+
+# Create the plot if we have data
+if length(x_coords) > 0
+    println("Found $(length(x_coords)) data points to plot")
+    
+    # Try different approaches
+    try
+        # Approach 1: Basic scatter3d
+        p3a = plot(x_coords, y_coords, z_coords, 
+                  seriestype=:scatter3d,
+                  title="Industry × Occupation (3D Scatter)",
+                  xlabel="Industry Code",
+                  ylabel="Occupation Code",
+                  zlabel="Number of People",
+                  markersize=5,
+                  color=:blue,
+                  alpha=0.7)
+        display(p3a)
+        
+    catch e1
+        println("Approach 1 failed: $e1")
+        
+        try
+            # Approach 2: Use GR backend for 3D
+            gr()
+            p3b = scatter(x_coords, y_coords, z_coords,
+                         title="Industry × Occupation (3D Scatter - GR)",
+                         xlabel="Industry Code",
+                         ylabel="Occupation Code",
+                         zlabel="Number of People",
+                         markersize=3,
+                         color=:red)
+            display(p3b)
+            plotlyjs()  # Switch back to plotlyjs
+            
+        catch e2
+            println("Approach 2 failed: $e2")
+            
+            # Approach 3: 2D scatter with count as color
+            println("Creating 2D scatter plot instead...")
+            p3c = scatter(x_coords, y_coords,
+                         markersize=z_coords./5,
+                         color=z_coords,
+                         title="Industry × Occupation (2D - Size = Count)",
+                         xlabel="Industry Code", 
+                         ylabel="Occupation Code",
+                         colorbar=true,
+                         alpha=0.7)
+            display(p3c)
+        end
+    end
+else
+    println("No valid data points found")
+    # Let's debug what we have
+    println("Industry codes: $valid_industry_codes")
+    println("Occupation codes: $valid_occupation_codes") 
+    println("Crosstab matrix size: $(size(crosstab_matrix))")
+    println("Non-zero elements in crosstab: $(count(crosstab_matrix .> 0))")
+end
+
+# Method 4: Enhanced Heatmap with annotations
+println("Creating enhanced heatmap...")
+p4 = heatmap(
+    occupation_codes,
+    industry_codes,
+    crosstab_matrix,
+    title="Industry × Occupation Heatmap",
+    xlabel="Occupation Code",
+    ylabel="Industry Code",
+    color=:hot,
+    aspect_ratio=:auto
+)
+
+# Add text annotations showing counts
+for (i, industry) in enumerate(industry_codes)
+    for (j, occupation) in enumerate(occupation_codes)
+        count = crosstab_matrix[i, j]
+        if count > 5  # Only show counts > 5 to avoid clutter
+            annotate!(p4, j, i, text(string(count), 8, :white, :center))
+        end
+    end
+end
+display(p4)
+
+# Method 5: Bar plots for top industries (DIMENSION FIX)
+println("Creating industry breakdown plots...")
+
+# Debug the dimensions first
+println("Debug info:")
+println("Number of industries: $n_industries")
+println("Number of occupations: $n_occupations")
+println("Crosstab matrix size: $(size(crosstab_matrix))")
+println("Valid industry codes length: $(length(valid_industry_codes))")
+println("Valid occupation codes length: $(length(valid_occupation_codes))")
+
+try
+    max_industries_to_show = min(3, n_industries)  # Start with just 3
+    
+    for i in 1:max_industries_to_show
+        industry = valid_industry_codes[i]
+        
+        # Get data for this industry (row i)
+        industry_data = crosstab_matrix[i, :]
+        
+        # Debug this specific industry
+        println("\nIndustry $industry (row $i):")
+        println("  Industry data length: $(length(industry_data))")
+        println("  Occupation codes length: $(length(valid_occupation_codes))")
+        println("  Industry data: $industry_data")
+        
+        # Make sure dimensions match
+        if length(industry_data) == length(valid_occupation_codes)
+            try
+                p_industry = bar(
+                    1:length(valid_occupation_codes),  # Use indices instead of codes
+                    industry_data,
+                    title="Industry $industry",
+                    xlabel="Occupation Index",
+                    ylabel="Count",
+                    color=:steelblue,
+                    alpha=0.7,
+                    legend=false,
+                    xticks=(1:length(valid_occupation_codes), string.(valid_occupation_codes))
+                )
+                display(p_industry)
+                println("✅ Successfully plotted industry $industry")
+                
+            catch e
+                println("❌ Plotting failed for industry $industry: $e")
+            end
+        else
+            println("❌ Dimension mismatch for industry $industry")
+            println("   Expected: $(length(valid_occupation_codes)), Got: $(length(industry_data))")
+        end
+    end
+    
+catch e
+    println("Overall error: $e")
+end
+
+# Alternative: Simple working version
+println("\n" * "="^50)
+println("ALTERNATIVE: Creating simple summary plots")
+
+try
+    # Plot 1: Total workers by industry
+    industry_totals = [sum(crosstab_matrix[i, :]) for i in 1:n_industries]
+    
+    p_industry_totals = bar(
+        1:length(industry_totals),
+        industry_totals,
+        title="Total Workers by Industry",
+        xlabel="Industry",
+        ylabel="Total Workers",
+        color=:lightblue,
+        legend=false,
+        xticks=(1:length(valid_industry_codes), string.(valid_industry_codes))
+    )
+    display(p_industry_totals)
+    
+    # Plot 2: Total workers by occupation
+    occupation_totals = [sum(crosstab_matrix[:, j]) for j in 1:n_occupations]
+    
+    p_occupation_totals = bar(
+        1:length(occupation_totals),
+        occupation_totals,
+        title="Total Workers by Occupation",
+        xlabel="Occupation",
+        ylabel="Total Workers",
+        color=:lightgreen,
+        legend=false,
+        xticks=(1:length(valid_occupation_codes), string.(valid_occupation_codes))
+    )
+    display(p_occupation_totals)
+    
+    println("✅ Summary plots created successfully!")
+    
+catch e
+    println("❌ Summary plots failed: $e")
+end
+
+# Super simple version if all else fails
+println("\n" * "="^30)
+println("SUPER SIMPLE VERSION:")
+
+try
+    # Just show the numbers
+    println("Top 5 industry-occupation combinations:")
+    
+    # Find top combinations
+    flat_indices = []
+    flat_values = []
+    
+    for i in 1:n_industries
+        for j in 1:n_occupations
+            push!(flat_indices, (i, j))
+            push!(flat_values, crosstab_matrix[i, j])
+        end
+    end
+    
+    # Sort by values
+    sorted_indices = sortperm(flat_values, rev=true)
+    
+    for k in 1:min(5, length(sorted_indices))
+        idx = flat_indices[sorted_indices[k]]
+        value = flat_values[sorted_indices[k]]
+        industry = valid_industry_codes[idx[1]]
+        occupation = valid_occupation_codes[idx[2]]
+        println("  $k. Industry $industry × Occupation $occupation: $value workers")
+    end
+    
+catch e
+    println("❌ Even simple version failed: $e")
+end
+
+# Summary of visualizations
+println("\n" * "="^60)
+println("3D VISUALIZATION SUMMARY:")
+println("📊 Created 5 different visualizations:")
+println("  1. 3D Surface Plot - Smooth surface showing distribution")
+println("  2. 3D Wireframe - Mesh view of the data structure")
+println("  3. 3D Scatter Plot - Bubble size = number of people")
+println("  4. Enhanced Heatmap - 2D with count annotations") 
+println("  5. Industry Breakdown - Separate bars for each industry")
+println("\n💡 Tips:")
+println("  • Click and drag to rotate the 3D plots")
+println("  • Use mouse wheel to zoom in/out")
+println("  • Hover over points to see exact values")
+println("="^60)
+
+# 3(f) Tabulate mean wage over industry and occupation categories
+println("\n3(f) Mean wage by industry and occupation using split-apply-combine")
+
+# Step 1: Subset the data frame to include only relevant columns
+wage_subset = select(nlsw88, [:industry, :occupation, :wage])
+println("Subset created with columns: $(names(wage_subset))")
+println("Dimensions: $(size(wage_subset))")
+
+# Check for missing values in our subset
+println("\nMissing values in subset:")
+for col in names(wage_subset)
+    missing_count = count(ismissing, wage_subset[!, col])
+    if missing_count > 0
+        println("  $col: $missing_count missing values")
+    end
+end
+
+# Step 2: Remove rows with missing values for complete cases analysis
+wage_complete = dropmissing(wage_subset)
+println("\nAfter removing missing values:")
+println("Dimensions: $(size(wage_complete))")
+
+# Step 3: Split-Apply-Combine approach
+
+# Method 1: Group by industry only
+println("\n📊 Mean wage by industry:")
+industry_wages = combine(groupby(wage_complete, :industry), 
+                        :wage => mean => :mean_wage,
+                        :wage => length => :count)
+display(industry_wages)
+
+# Method 2: Group by occupation only  
+println("\n📊 Mean wage by occupation:")
+occupation_wages = combine(groupby(wage_complete, :occupation),
+                          :wage => mean => :mean_wage,
+                          :wage => length => :count)
+display(occupation_wages)
+
+# Method 3: Group by both industry and occupation (cross-tabulation of means)
+println("\n📊 Mean wage by industry AND occupation:")
+industry_occupation_wages = combine(groupby(wage_complete, [:industry, :occupation]),
+                                   :wage => mean => :mean_wage,
+                                   :wage => std => :std_wage,
+                                   :wage => length => :count)
+display(industry_occupation_wages)
+
+# Step 4: Create a pivot table for better visualization
+println("\n📊 Creating pivot table of mean wages:")
+
+# Use unstack to create a cross-tabulation format
+try
+    wage_pivot = unstack(industry_occupation_wages, :industry, :occupation, :mean_wage)
+    println("Mean wage pivot table (Industry × Occupation):")
+    display(wage_pivot)
+    
+    # Fill missing values with "---" for display
+    wage_pivot_display = copy(wage_pivot)
+    for col in names(wage_pivot_display)
+        if col != :industry  # Don't modify the industry column
+            wage_pivot_display[!, col] = coalesce.(wage_pivot_display[!, col], "---")
+        end
+    end
+    
+    println("\nFormatted pivot table (missing combinations shown as '---'):")
+    display(wage_pivot_display)
+    
+catch e
+    println("Pivot table creation failed: $e")
+    println("Showing the grouped data instead:")
+    display(industry_occupation_wages)
+end
+
+# Step 5: Summary statistics
+println("\n" * "="^60)
+println("WAGE ANALYSIS SUMMARY:")
+
+# Overall wage statistics
+overall_mean = mean(wage_complete.wage)
+overall_std = std(wage_complete.wage)
+overall_min = minimum(wage_complete.wage)
+overall_max = maximum(wage_complete.wage)
+
+println("Overall wage statistics:")
+println("  Mean: \$$(round(overall_mean, digits=2))")
+println("  Std Dev: \$$(round(overall_std, digits=2))")
+println("  Range: \$$(round(overall_min, digits=2)) - \$$(round(overall_max, digits=2))")
+
+# Find highest and lowest paying combinations
+if nrow(industry_occupation_wages) > 0
+    highest_wage_idx = argmax(industry_occupation_wages.mean_wage)
+    lowest_wage_idx = argmin(industry_occupation_wages.mean_wage)
+    
+    highest_combo = industry_occupation_wages[highest_wage_idx, :]
+    lowest_combo = industry_occupation_wages[lowest_wage_idx, :]
+    
+    println("\nHighest paying combination:")
+    println("  Industry $(highest_combo.industry) × Occupation $(highest_combo.occupation)")
+    println("  Mean wage: \$$(round(highest_combo.mean_wage, digits=2))")
+    println("  Number of workers: $(highest_combo.count)")
+    
+    println("\nLowest paying combination:")
+    println("  Industry $(lowest_combo.industry) × Occupation $(lowest_combo.occupation)")
+    println("  Mean wage: \$$(round(lowest_combo.mean_wage, digits=2))")
+    println("  Number of workers: $(lowest_combo.count)")
+end
+
+# Industry with highest mean wage
+if nrow(industry_wages) > 0
+    top_industry_idx = argmax(industry_wages.mean_wage)
+    top_industry = industry_wages[top_industry_idx, :]
+    println("\nHighest paying industry:")
+    println("  Industry $(top_industry.industry): \$$(round(top_industry.mean_wage, digits=2))")
+end
+
+# Occupation with highest mean wage
+if nrow(occupation_wages) > 0
+    top_occupation_idx = argmax(occupation_wages.mean_wage)
+    top_occupation = occupation_wages[top_occupation_idx, :]
+    println("\nHighest paying occupation:")
+    println("  Occupation $(top_occupation.occupation): \$$(round(top_occupation.mean_wage, digits=2))")
+end
+
+println("="^60)
+
+# 3(g) Wrap all code for question 3 in a function
+function q3()
+    using CSV, DataFrames, FreqTables, Statistics, Plots
+    
+    # Force Julia to work in the script's directory
+    println("Current working directory: $(pwd())")
+    cd(dirname(@__FILE__))
+    println("Changed to script directory: $(pwd())")
+    
+    println("\n" ^ 2 * "="^50)
+    println("QUESTION 3: Reading in Data and calculating summary statistics")
+    println("="^50)
+    
+    # 3(a) Import nlsw88.csv and process it
+    println("\n3(a) Importing and processing nlsw88.csv")
+    
+    # Read the raw CSV file with explicit missing value handling
+    nlsw88 = CSV.read("nlsw88.csv", DataFrame, 
+                      missingstring=["", "NA", "NULL", ".", "missing", "n/a", " "])
+    
+    println("Raw data loaded:")
+    println("Dimensions: $(size(nlsw88))")
+    println("Column names: $(names(nlsw88))")
+    
+    # Check data types
+    println("\nColumn types:")
+    for col in names(nlsw88)
+        println("  $col: $(eltype(nlsw88[!, col]))")
+    end
+    
+    # Check for missing values in the raw data
+    println("\nMissing values per column:")
+    missing_summary = []
+    for col in names(nlsw88)
+        missing_count = count(ismissing, nlsw88[!, col])
+        total_count = nrow(nlsw88)
+        if missing_count > 0
+            pct_missing = round(100 * missing_count / total_count, digits=1)
+            println("  $col: $missing_count/$total_count ($pct_missing%)")
+            push!(missing_summary, (col, missing_count, pct_missing))
+        else
+            println("  $col: 0 missing values")
+        end
+    end
+    
+    # Clean variable names
+    println("\nCleaning variable names...")
+    original_names = names(nlsw88)
+    cleaned_names = [lowercase(string(col)) for col in names(nlsw88)]
+    rename!(nlsw88, Symbol.(cleaned_names))
+    println("Variable names after cleaning: $(names(nlsw88))")
+    
+    # Additional data validation
+    println("\nData validation:")
+    println("Sample of first 5 rows:")
+    display(first(nlsw88, 5))
+    
+    # Check ranges for key variables
+    println("\nData ranges for key numeric variables:")
+    numeric_cols = ["age", "grade", "wage", "hours", "ttl_exp", "tenure"]
+    for col in numeric_cols
+        if col in names(nlsw88)
+            col_data = skipmissing(nlsw88[!, col])
+            if !isempty(col_data)
+                min_val = minimum(col_data)
+                max_val = maximum(col_data)
+                mean_val = round(mean(col_data), digits=2)
+                println("  $col: [$min_val, $max_val], mean = $mean_val")
+            else
+                println("  $col: all values are missing")
+            end
+        end
+    end
+    
+    # Save the processed data
+    CSV.write("nlsw88_processed.csv", nlsw88)
+    println("\n✅ Processed data saved as 'nlsw88_processed.csv'")
+    
+    # 3(b) Calculate percentages for marital status and education
+    println("\n3(b) Calculating sample percentages")
+    
+    total_obs = nrow(nlsw88)
+    println("Total observations: $total_obs")
+    
+    # Never been married percentage
+    never_married_count = count(x -> !ismissing(x) && x == 1, nlsw88.never_married)
+    never_married_missing = count(ismissing, nlsw88.never_married)
+    never_married_valid = total_obs - never_married_missing
+    never_married_pct = round(100 * never_married_count / never_married_valid, digits=2)
+    
+    println("\nNever been married:")
+    println("  Count: $never_married_count out of $never_married_valid valid responses")
+    println("  Percentage: $never_married_pct%")
+    
+    # College graduates percentage
+    college_grad_count = count(x -> !ismissing(x) && x == 1, nlsw88.collgrad)
+    collgrad_missing = count(ismissing, nlsw88.collgrad)
+    collgrad_valid = total_obs - collgrad_missing
+    college_grad_pct = round(100 * college_grad_count / collgrad_valid, digits=2)
+    
+    println("\nCollege graduates:")
+    println("  Count: $college_grad_count out of $collgrad_valid valid responses")
+    println("  Percentage: $college_grad_pct%")
+    
+    # 3(c) Use freqtable() to report race category percentages
+    println("\n3(c) Race category frequencies using freqtable()")
+    
+    race_freq = freqtable(nlsw88.race)
+    println("Frequency table for race:")
+    println(race_freq)
+    
+    total_valid = sum(race_freq)
+    println("\nRace category percentages:")
+    for (category, count) in pairs(race_freq)
+        percentage = round(100 * count / total_valid, digits=2)
+        println("  Race $category: $count observations ($percentage%)")
+    end
+    
+    # 3(d) Use describe() function to create summary statistics matrix
+    println("\n3(d) Creating summary statistics using describe()")
+    
+    summarystats = describe(nlsw88)
+    println("Summary statistics for all variables:")
+    display(summarystats)
+    
+    grade_missing = count(ismissing, nlsw88.grade)
+    grade_total = nrow(nlsw88)
+    println("\nGrade variable missing value analysis:")
+    println("Missing grade observations: $grade_missing")
+    
+    # 3(e) Show joint distribution using cross-tabulation
+    println("\n3(e) Cross-tabulation of industry and occupation")
+    
+    crosstab = freqtable(nlsw88.industry, nlsw88.occupation)
+    println("Cross-tabulation: Industry (rows) × Occupation (columns)")
+    display(crosstab)
+    
+    # 3D Visualization of Cross-tabulation
+    plotlyjs()
+    println("\n📊 Creating visualizations of industry-occupation cross-tabulation")
+    
+    crosstab_matrix = Matrix(crosstab)
+    valid_industry_codes = collect(names(crosstab, 1))
+    valid_occupation_codes = collect(names(crosstab, 2))
+    
+    # Simple heatmap
+    try
+        p_heatmap = heatmap(
+            valid_occupation_codes,
+            valid_industry_codes,
+            crosstab_matrix,
+            title="Industry × Occupation Heatmap",
+            xlabel="Occupation Code",
+            ylabel="Industry Code",
+            color=:hot
+        )
+        display(p_heatmap)
+    catch e
+        println("Heatmap creation failed: $e")
+    end
+    
+    # 3(f) Tabulate mean wage over industry and occupation categories
+    println("\n3(f) Mean wage by industry and occupation using split-apply-combine")
+    
+    # Subset the data frame
+    wage_subset = select(nlsw88, [:industry, :occupation, :wage])
+    println("Subset created with columns: $(names(wage_subset))")
+    
+    # Remove missing values
+    wage_complete = dropmissing(wage_subset)
+    println("After removing missing values: $(size(wage_complete))")
+    
+    # Group by industry only
+    println("\n📊 Mean wage by industry:")
+    industry_wages = combine(groupby(wage_complete, :industry), 
+                            :wage => mean => :mean_wage,
+                            :wage => length => :count)
+    display(industry_wages)
+    
+    # Group by occupation only  
+    println("\n📊 Mean wage by occupation:")
+    occupation_wages = combine(groupby(wage_complete, :occupation),
+                              :wage => mean => :mean_wage,
+                              :wage => length => :count)
+    display(occupation_wages)
+    
+    # Group by both industry and occupation
+    println("\n📊 Mean wage by industry AND occupation:")
+    industry_occupation_wages = combine(groupby(wage_complete, [:industry, :occupation]),
+                                       :wage => mean => :mean_wage,
+                                       :wage => std => :std_wage,
+                                       :wage => length => :count)
+    display(industry_occupation_wages)
+    
+    # Create pivot table
+    try
+        wage_pivot = unstack(industry_occupation_wages, :industry, :occupation, :mean_wage)
+        println("\nMean wage pivot table (Industry × Occupation):")
+        display(wage_pivot)
+    catch e
+        println("Pivot table creation failed: $e")
+    end
+    
+    # Summary statistics
+    println("\n" * "="^50)
+    println("ANALYSIS SUMMARY:")
+    println("• $never_married_pct% of the sample has never been married")
+    println("• $college_grad_pct% of the sample are college graduates")
+    println("• $grade_missing observations have missing grade data")
+    println("• Mean wage analysis completed for $(nrow(wage_complete)) complete cases")
+    
+    if nrow(industry_occupation_wages) > 0
+        highest_wage_idx = argmax(industry_occupation_wages.mean_wage)
+        highest_combo = industry_occupation_wages[highest_wage_idx, :]
+        println("• Highest paying combination: Industry $(highest_combo.industry) × Occupation $(highest_combo.occupation)")
+        println("  Mean wage: \$$(round(highest_combo.mean_wage, digits=2))")
+    end
+    println("="^50)
+    
+    println("\n✅ Question 3 completed!")
+    
+    return nothing
+end
+
+# Call all functions in order
+A, B, C, D = q1()
+q2(A, B, C)
+q3()
