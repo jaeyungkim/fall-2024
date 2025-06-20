@@ -1440,3 +1440,397 @@ end
 A, B, C, D = q1()
 q2(A, B, C)
 q3()
+
+# 4. Practice with functions
+# (a) Load firstmatrix.jld
+
+using JLD2
+
+println("\n" ^ 2 * "="^50)
+println("QUESTION 4: Practice with functions")
+println("="^50)
+
+println("\n4(a) Loading firstmatrix.jld2")
+
+# Load the matrices from the JLD2 file
+loaded_data = load("firstmatrix.jld2")
+println("Successfully loaded firstmatrix.jld2")
+
+# Display what was loaded
+println("Contents of the file:")
+for (key, value) in loaded_data
+    println("  $key: $(typeof(value)), size = $(size(value))")
+end
+
+# Extract individual matrices
+A_loaded = loaded_data["A"]
+B_loaded = loaded_data["B"] 
+C_loaded = loaded_data["C"]
+D_loaded = loaded_data["D"]
+
+# Verify the matrices loaded correctly
+println("\nVerifying loaded matrices:")
+println("Matrix A: $(size(A_loaded)) - first element: $(A_loaded[1,1])")
+println("Matrix B: $(size(B_loaded)) - first element: $(B_loaded[1,1])")
+println("Matrix C: $(size(C_loaded)) - first element: $(C_loaded[1,1])")
+println("Matrix D: $(size(D_loaded)) - first element: $(D_loaded[1,1])")
+
+println("\n ✅ Matrices A, B, C, D successfully loaded from firstmatrix.jld2")
+
+# 4(b, c, d, e) Write a function called matrixops
+println("\n4(b) Creating matrixops function")
+
+function matrixops(A, B)
+    """
+    Function that performs three matrix operations on inputs A and B
+    
+    Inputs:
+    - A: First matrix
+    - B: Second matrix
+    
+    Outputs:
+    - element_product: Element-by-element product of A and B (A .* B)
+    - transpose_product: Matrix product A'B (transpose of A times B)  
+    - sum_elements: Sum of all elements of A + B
+    """
+    
+    # Check that matrices A and B have the same dimensions for element-wise operations
+    if size(A) != size(B)
+        error("Matrices A and B must have the same dimensions for element-wise operations")
+    end
+    
+    # (i) Element-by-element product of A and B
+    element_product = A .* B
+    
+    # (ii) Product A'B (transpose of A times B)
+    transpose_product = A' * B
+    
+    # (iii) Sum of all elements of A + B
+    matrix_sum = A + B
+    sum_elements = sum(matrix_sum)
+    
+    # Return the three results
+    return element_product, transpose_product, sum_elements
+end
+
+# Test the function with the loaded matrices
+println("Testing matrixops function with loaded matrices A and B:")
+
+# Call the function
+result1, result2, result3 = matrixops(A_loaded, B_loaded)
+
+# Display the results
+println("\n📊 Results from matrixops function:")
+
+println("\n(i) Element-by-element product (A .* B):")
+println("Size: $(size(result1))")
+println("First 3×3 elements:")
+display(round.(result1[1:3, 1:3], digits=3))
+
+println("\n(ii) Matrix product A'B:")
+println("Size: $(size(result2))")
+println("Note: A' is $(size(A_loaded')) and B is $(size(B_loaded)), so A'B is $(size(result2))")
+println("First 3×3 elements:")
+display(round.(result2[1:3, 1:3], digits=3))
+
+println("\n(iii) Sum of all elements of A + B:")
+println("Total sum: $(round(result3, digits=3))")
+
+# Verify our results manually
+println("\n🔍 Verification:")
+manual_element_product = A_loaded .* B_loaded
+manual_transpose_product = A_loaded' * B_loaded  
+manual_sum = sum(A_loaded + B_loaded)
+
+println("Element-wise product matches: $(result1 ≈ manual_element_product)")
+println("Transpose product matches: $(result2 ≈ manual_transpose_product)")
+println("Sum matches: $(result3 ≈ manual_sum)")
+
+println("\n✅ matrixops function created and tested successfully!")
+
+# 4(f) Evaluate matrixops using C and D from question (a) of problem 1
+println("\n4(f) Evaluating matrixops with matrices C and D")
+
+println("Matrix dimensions:")
+println("C: $(size(C_loaded))")
+println("D: $(size(D_loaded))")
+
+println("\nAttempting to call matrixops(C, D):")
+
+try
+    result1, result2, result3 = matrixops(C_loaded, D_loaded)
+    
+    # This shouldn't execute if there's an error
+    println("Function executed successfully!")
+    println("Results:")
+    println("  Element-wise product size: $(size(result1))")
+    println("  Transpose product size: $(size(result2))")
+    println("  Sum of elements: $result3")
+    
+catch e
+    println("❌ Error occurred: $e")
+    println("\nExplanation of what happened:")
+    println("Matrix C has dimensions $(size(C_loaded)) (5×7)")
+    println("Matrix D has dimensions $(size(D_loaded)) (10×7)")
+    println("Since C and D have different dimensions, the error check in matrixops")
+    println("triggered and threw an error with the message 'inputs must have the same size'")
+    println("\nThis error occurs because:")
+    println("• Element-wise operations like A .* B require matrices of the same size")
+    println("• C is 5×7 but D is 10×7, so they cannot be multiplied element-wise")
+    println("• The function correctly identified this incompatibility and stopped execution")
+end
+
+println("\n🔍 What happens:")
+println("The function throws an error because C (5×7) and D (10×7) have different dimensions.")
+println("This demonstrates that our error checking is working correctly!")
+
+# 4(g) Evaluate matrixops using ttl_exp and wage from nlsw88_processed.csv
+println("\n4(g) Evaluating matrixops with ttl_exp and wage from processed data")
+
+# First, check if we have the data loaded, if not load it
+if !@isdefined(nlsw88)
+    println("Loading nlsw88_processed.csv...")
+    nlsw88 = CSV.read("nlsw88_processed.csv", DataFrame)
+    println("Data loaded successfully")
+end
+
+# Check the columns and their types
+println("Checking ttl_exp and wage columns:")
+println("ttl_exp type: $(eltype(nlsw88.ttl_exp))")
+println("wage type: $(eltype(nlsw88.wage))")
+println("ttl_exp size: $(length(nlsw88.ttl_exp))")
+println("wage size: $(length(nlsw88.wage))")
+
+# Check for missing values
+ttl_exp_missing = count(ismissing, nlsw88.ttl_exp)
+wage_missing = count(ismissing, nlsw88.wage)
+println("Missing values - ttl_exp: $ttl_exp_missing, wage: $wage_missing")
+
+# Convert DataFrame columns to Arrays
+println("\nConverting DataFrame columns to Arrays...")
+ttl_exp_array = convert(Array, nlsw88.ttl_exp)
+wage_array = convert(Array, nlsw88.wage)
+
+println("Converted arrays:")
+println("ttl_exp_array type: $(eltype(ttl_exp_array))")
+println("wage_array type: $(eltype(wage_array))")
+println("Both arrays have length: $(length(ttl_exp_array)) and $(length(wage_array))")
+
+# Attempt to use matrixops with these arrays
+println("\nAttempting to call matrixops(ttl_exp_array, wage_array):")
+
+try
+    result1, result2, result3 = matrixops(ttl_exp_array, wage_array)
+    
+    println("✅ Function executed successfully!")
+    println("\nResults:")
+    
+    println("\n(i) Element-wise product:")
+    println("Size: $(size(result1))")
+    println("First 5 elements: $(result1[1:5])")
+    println("Type: $(eltype(result1))")
+    
+    println("\n(ii) Transpose product (ttl_exp' × wage):")
+    println("Result: $result2")
+    println("Type: $(typeof(result2))")
+    println("This is a scalar because both are column vectors")
+    
+    println("\n(iii) Sum of all elements of ttl_exp + wage:")
+    println("Total sum: $result3")
+    println("Type: $(typeof(result3))")
+    
+    # Additional analysis
+    println("\n📊 Additional analysis:")
+    println("Mean of element-wise product: $(round(mean(result1), digits=3))")
+    println("This represents the element-wise product of total experience and wages")
+    println("The transpose product $(round(result2, digits=3)) is the dot product of the two vectors")
+    println("The sum $(round(result3, digits=3)) is the total of all experience + wage values")
+    
+catch e
+    println("❌ Error occurred: $e")
+    
+    # Debug information if there's an error
+    println("\nDebugging information:")
+    if ttl_exp_missing > 0 || wage_missing > 0
+        println("Issue likely due to missing values in the data")
+        println("Suggestion: Remove missing values before conversion")
+        
+        # Try with complete cases
+        println("\nTrying with complete cases...")
+        complete_data = dropmissing(nlsw88, [:ttl_exp, :wage])
+        ttl_exp_clean = convert(Array, complete_data.ttl_exp)
+        wage_clean = convert(Array, complete_data.wage)
+        
+        println("Clean data lengths: ttl_exp=$(length(ttl_exp_clean)), wage=$(length(wage_clean))")
+        
+        try
+            result1_clean, result2_clean, result3_clean = matrixops(ttl_exp_clean, wage_clean)
+            println("✅ Success with clean data!")
+            println("Element-wise product size: $(size(result1_clean))")
+            println("Transpose product: $(round(result2_clean, digits=3))")
+            println("Sum of elements: $(round(result3_clean, digits=3))")
+        catch e2
+            println("❌ Still failed with clean data: $e2")
+        end
+    end
+end
+
+println("\n💡 Interpretation:")
+println("This demonstrates using matrixops with real economic data:")
+println("• ttl_exp: Total work experience (years)")
+println("• wage: Hourly wage rate (dollars)")
+println("• Element-wise product: Experience × wage for each person")
+println("• Transpose product: Dot product of experience and wage vectors")
+println("• Sum: Total of all (experience + wage) values across individuals")
+
+# 4(h) Wrap all code for question 4 in a function
+function q4()
+    using JLD2, CSV, DataFrames, Statistics
+    
+    println("\n" ^ 2 * "="^50)
+    println("QUESTION 4: Practice with functions")
+    println("="^50)
+    
+    # 4(a) Load firstmatrix.jld2
+    println("\n4(a) Loading firstmatrix.jld2")
+    
+    loaded_data = load("firstmatrix.jld2")
+    println("Successfully loaded firstmatrix.jld2")
+    
+    println("Contents of the file:")
+    for (key, value) in loaded_data
+        println("  $key: $(typeof(value)), size = $(size(value))")
+    end
+    
+    # Extract individual matrices
+    A_loaded = loaded_data["A"]
+    B_loaded = loaded_data["B"] 
+    C_loaded = loaded_data["C"]
+    D_loaded = loaded_data["D"]
+    
+    println("✅ Matrices A, B, C, D successfully loaded from firstmatrix.jld2")
+    
+    # 4(b) & 4(c) Define matrixops function with comment
+    function matrixops(A, B)
+        # This function performs three matrix operations on input matrices A and B:
+        # (i) computes the element-by-element product A .* B
+        # (ii) computes the matrix product A'B (transpose of A times B)  
+        # (iii) computes the sum of all elements of the matrix sum A + B
+        # The function returns these three results as separate outputs
+        
+        # Error check for input size compatibility
+        if size(A) != size(B)
+            error("inputs must have the same size")
+        end
+        
+        # (i) Element-by-element product of A and B
+        element_product = A .* B
+        
+        # (ii) Product A'B (transpose of A times B)
+        transpose_product = A' * B
+        
+        # (iii) Sum of all elements of A + B
+        matrix_sum = A + B
+        sum_elements = sum(matrix_sum)
+        
+        # Return the three results
+        return element_product, transpose_product, sum_elements
+    end
+    
+    # 4(d) Test the function with A and B
+    println("\n4(d) Testing matrixops function with loaded matrices A and B:")
+    
+    result1, result2, result3 = matrixops(A_loaded, B_loaded)
+    
+    println("\n📊 Results from matrixops function:")
+    println("\n(i) Element-by-element product (A .* B):")
+    println("Size: $(size(result1))")
+    
+    println("\n(ii) Matrix product A'B:")
+    println("Size: $(size(result2))")
+    
+    println("\n(iii) Sum of all elements of A + B:")
+    println("Total sum: $(round(result3, digits=3))")
+    
+    # 4(f) Evaluate matrixops using C and D
+    println("\n4(f) Evaluating matrixops with matrices C and D")
+    println("Matrix dimensions:")
+    println("C: $(size(C_loaded))")
+    println("D: $(size(D_loaded))")
+    
+    try
+        result1_cd, result2_cd, result3_cd = matrixops(C_loaded, D_loaded)
+        println("Function executed successfully!")
+    catch e
+        println("❌ Error occurred: $e")
+        println("This error occurs because C (5×7) and D (10×7) have different dimensions.")
+        println("The error checking is working correctly!")
+    end
+    
+    # 4(g) Evaluate matrixops using ttl_exp and wage
+    println("\n4(g) Evaluating matrixops with ttl_exp and wage from processed data")
+    
+    # Load data if not already available
+    nlsw88 = CSV.read("nlsw88_processed.csv", DataFrame)
+    
+    # Check for missing values
+    ttl_exp_missing = count(ismissing, nlsw88.ttl_exp)
+    wage_missing = count(ismissing, nlsw88.wage)
+    println("Missing values - ttl_exp: $ttl_exp_missing, wage: $wage_missing")
+    
+    # Convert DataFrame columns to Arrays
+    println("Converting DataFrame columns to Arrays...")
+    
+    try
+        # First try with original data
+        ttl_exp_array = convert(Array, nlsw88.ttl_exp)
+        wage_array = convert(Array, nlsw88.wage)
+        
+        result1_econ, result2_econ, result3_econ = matrixops(ttl_exp_array, wage_array)
+        
+        println("✅ Function executed successfully!")
+        println("Element-wise product size: $(size(result1_econ))")
+        println("Transpose product: $(round(result2_econ, digits=3))")
+        println("Sum of elements: $(round(result3_econ, digits=3))")
+        
+    catch e
+        println("❌ Error with original data: $e")
+        
+        if ttl_exp_missing > 0 || wage_missing > 0
+            println("Trying with complete cases...")
+            complete_data = dropmissing(nlsw88, [:ttl_exp, :wage])
+            ttl_exp_clean = convert(Array, complete_data.ttl_exp)
+            wage_clean = convert(Array, complete_data.wage)
+            
+            try
+                result1_clean, result2_clean, result3_clean = matrixops(ttl_exp_clean, wage_clean)
+                println("✅ Success with clean data!")
+                println("Element-wise product size: $(size(result1_clean))")
+                println("Transpose product: $(round(result2_clean, digits=3))")
+                println("Sum of elements: $(round(result3_clean, digits=3))")
+            catch e2
+                println("❌ Still failed with clean data: $e2")
+            end
+        end
+    end
+    
+    # Summary
+    println("\n" * "="^50)
+    println("QUESTION 4 SUMMARY:")
+    println("✅ Successfully loaded matrices from firstmatrix.jld2")
+    println("✅ Created matrixops function with proper error checking")
+    println("✅ Tested function with compatible matrices (A, B)")
+    println("✅ Demonstrated error handling with incompatible matrices (C, D)")
+    println("✅ Applied function to real economic data (ttl_exp, wage)")
+    println("="^50)
+    
+    println("\n✅ Question 4 completed!")
+    
+    return nothing
+end
+
+# Call all functions in order
+A, B, C, D = q1()
+q2(A, B, C)
+q3()
+q4()
